@@ -36,7 +36,7 @@ void __builtin_type(std::string input) {
     if (BUILTIN_FUNCTIONS.count(input) || input == "exit")
         std::cout << input << " is a shell builtin" << std::endl;
     else
-        std::cout << "invalid command: not found" << std::endl;
+        std::cout << input << ": not found" << std::endl;
 }
 
 
