@@ -7,7 +7,7 @@
 
 
 namespace fs = std::filesystem;
-
+/*
 #if __linux__
     const char *PATH_DELIMITER = ":";
     const char *PATH_SEPARATOR = "/";
@@ -18,7 +18,9 @@ namespace fs = std::filesystem;
     const char *PATH_DELIMITER = ":";
     const char *PATH_SEPARATOR = "/";
 #endif
-
+*/
+const char *PATH_DELIMITER = ";";
+const char *PATH_SEPARATOR = "\\";
 // define PATH at compile time, but populate at program start.
 // Note: std::vector is a dynamic array
 std::vector<std::string> PATH;
@@ -72,7 +74,9 @@ bool __search_file(
     return false;
 }
 
-
+/**
+ * Implements `echo` command.
+ */
 void __builtin_echo(std::string input) {
     std::cout << input << std::endl;    
 }
@@ -99,7 +103,7 @@ void __builtin_type(std::string input) {
 
     bool found = false;
     std::string executable_path;
-
+/*
     if (PATH.size() == 0)
         found = false;
     else {
@@ -112,11 +116,12 @@ void __builtin_type(std::string input) {
             }
         }
     }
-    
+ */   
     if (found)
         std::cout << input << " is " << executable_path << std::endl;
     else
         std::cout << input << ": not found" << std::endl;
+
 }
 
 
