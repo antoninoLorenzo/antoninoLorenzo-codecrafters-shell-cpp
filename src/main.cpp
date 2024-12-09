@@ -1,8 +1,27 @@
 #include <iostream>
 #include <string>
+#include <vector>
 #include <unordered_map>
 #include <functional>
+#include <filesystem>
 
+
+namespace fs = std::filesystem;
+
+#if __linux__
+    const char *PATH_DELIMITER = ":";
+    const char *PATH_SEPARATOR = "/";
+#elif _WIN32
+    const char *PATH_DELIMITER = ";";
+    const char *PATH_SEPARATOR = "\\";
+#else
+    const char *PATH_DELIMITER = ":";
+    const char *PATH_SEPARATOR = "/";
+#endif
+
+// define PATH at compile time, but populate at program start.
+// Note: std::vector is a dynamic array
+std::vector<std::string> PATH;
 
 // unordered map should be more efficient for direct access
 std::unordered_map<
@@ -10,40 +29,109 @@ std::unordered_map<
     std::function<void(std::string)>
 > BUILTIN_FUNCTIONS;
 
-// a template is like a java generics, with the difference 
-// that its compiled instead than determined at runtime, for example:
-// some_function(T input) is compiled two times if used both as
-// some_function("Hello") and some_function(1)
+
+/**
+ * Divides a string in a vector of substrings based on a delimiter.
+ */
+void split(
+    std::vector<std::string>  *vec_ptr,
+    std::string                str,
+    const char                *delimiter
+){
+    int start = 0, end;
+    while (start < str.size()){
+        end = str.find(delimiter, start+1) + 1;
+        vec_ptr->push_back(str.substr(start, end - start - 1));
+        start = end;
+    }
+}
+
+
+/**
+ * Search a file in a directory.
+ * @return true if found, otherwise false
+ */
+bool __search_file(
+    std::string absolute_path,
+    std::string file_name
+) {
+    fs::path abs(absolute_path);
+    // the absolute_path should refer to a directory, if that's not
+    // the case, this means the PATH is not set correctly.
+    if (fs::is_directory(absolute_path) == false) {
+        return false;
+    }
+
+    for (auto const& dir_entry : fs::directory_iterator{abs}) {
+        if (dir_entry.is_directory())
+            continue;
+        if (dir_entry.path().stem().string() == file_name)
+            return true;
+    }
+
+    return false;
+}
+
 
 void __builtin_echo(std::string input) {
     std::cout << input << std::endl;    
 }
 
 /**
- * Implements `type` command, used to determine how a command would
- * be interpreted.
+ * Implements `type` command, used to determine if a command is available.
+ * It searches in BUILTIN_COMMANDS and in PATH.
  * 
  * Examples:
  * 
  * $ type echo
  * echo is a shell builtin
  * 
+ * $ type python.exe
+ * python is /usr/local/bin/python
+ * 
  * $ type something
- * invalid command: not found
+ * something: not found
  * 
  */
 void __builtin_type(std::string input) {
     if (BUILTIN_FUNCTIONS.count(input) || input == "exit")
         std::cout << input << " is a shell builtin" << std::endl;
+
+    bool found = false;
+    std::string executable_path;
+
+    if (PATH.size() == 0)
+        found = false;
+    else {
+        // search executable in PATH folders
+        for (int i = 0; i < PATH.size(); i++) {
+            found = __search_file(PATH.at(i), input);
+            if (found) {
+                executable_path = PATH.at(i) + PATH_SEPARATOR + input;
+                break;
+            }
+        }
+    }
+    
+    if (found)
+        std::cout << input << " is " << executable_path << std::endl;
     else
         std::cout << input << ": not found" << std::endl;
 }
 
 
 int main() {
+    bool DEBUG = true;
     // Flush after every std::cout / std:cerr
     std::cout << std::unitbuf;
     std::cerr << std::unitbuf;
+
+    // parse PATH
+    const char* path_raw = getenv("PATH");
+    if (path_raw != nullptr) {
+        std::string path_str = path_raw;
+        split(&PATH, path_str, PATH_DELIMITER);
+    }
 
     // map lambda functions
     // [captures](parameters) -> return_type { body }
