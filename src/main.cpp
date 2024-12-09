@@ -6,7 +6,7 @@
 #include <filesystem>
 
 
-// namespace fs = std::filesystem;
+namespace fs = std::filesystem;
 
 #if __linux__
     const char *PATH_DELIMITER = ":";
@@ -55,14 +55,14 @@ bool __search_file(
     std::string absolute_path,
     std::string file_name
 ) {
-    std::filesystem::path abs(absolute_path);
+    fs::path abs(absolute_path);
     // the absolute_path should refer to a directory, if that's not
     // the case, this means the PATH is not set correctly.
-    if (std::filesystem::is_directory(absolute_path) == false) {
+    if (fs::is_directory(absolute_path) == false) {
         return false;
     }
 
-    for (auto const& dir_entry : std::filesystem::directory_iterator{abs}) {
+    for (auto const& dir_entry : fs::directory_iterator{abs}) {
         if (dir_entry.is_directory())
             continue;
         if (dir_entry.path().stem().string() == file_name)
@@ -141,8 +141,8 @@ int main() {
     };
 
     // Flush after every std::cout / std:cerr
-    std::cout << std::unitbuf;
-    std::cerr << std::unitbuf;
+    //std::cout << std::unitbuf;
+    //std::cerr << std::unitbuf;
 
     // REPL
     while (true) {
