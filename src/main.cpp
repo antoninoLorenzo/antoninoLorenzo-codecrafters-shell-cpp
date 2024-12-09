@@ -7,7 +7,7 @@
 
 
 namespace fs = std::filesystem;
-/*
+
 #if __linux__
     const char *PATH_DELIMITER = ":";
     const char *PATH_SEPARATOR = "/";
@@ -18,9 +18,7 @@ namespace fs = std::filesystem;
     const char *PATH_DELIMITER = ":";
     const char *PATH_SEPARATOR = "/";
 #endif
-*/
-const char *PATH_DELIMITER = ";";
-const char *PATH_SEPARATOR = "\\";
+
 // define PATH at compile time, but populate at program start.
 // Note: std::vector is a dynamic array
 std::vector<std::string> PATH;
@@ -103,7 +101,7 @@ void __builtin_type(std::string input) {
 
     bool found = false;
     std::string executable_path;
-/*
+
     if (PATH.size() == 0)
         found = false;
     else {
@@ -116,7 +114,7 @@ void __builtin_type(std::string input) {
             }
         }
     }
- */   
+   
     if (found)
         std::cout << input << " is " << executable_path << std::endl;
     else
@@ -126,11 +124,6 @@ void __builtin_type(std::string input) {
 
 
 int main() {
-    bool DEBUG = true;
-    // Flush after every std::cout / std:cerr
-    std::cout << std::unitbuf;
-    std::cerr << std::unitbuf;
-
     // parse PATH
     const char* path_raw = getenv("PATH");
     if (path_raw != nullptr) {
@@ -146,6 +139,10 @@ int main() {
     BUILTIN_FUNCTIONS["type"] = [](std::string input){
         __builtin_type(input);
     };
+
+    // Flush after every std::cout / std:cerr
+    std::cout << std::unitbuf;
+    std::cerr << std::unitbuf;
 
     // REPL
     while (true) {
