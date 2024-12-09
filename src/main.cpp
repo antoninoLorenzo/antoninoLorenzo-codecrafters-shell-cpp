@@ -131,8 +131,7 @@ int main() {
         split(&PATH, path_str, PATH_DELIMITER);
     }
 
-    // map lambda functions
-    // [captures](parameters) -> return_type { body }
+    // map command names to functions
     BUILTIN_FUNCTIONS["echo"] = [](std::string input){
         __builtin_echo(input);
     };
@@ -141,8 +140,9 @@ int main() {
     };
 
     // Flush after every std::cout / std:cerr
-    //std::cout << std::unitbuf;
-    //std::cerr << std::unitbuf;
+    // Note: I tried removing also this
+    std::cout << std::unitbuf;
+    std::cerr << std::unitbuf;
 
     // REPL
     while (true) {
