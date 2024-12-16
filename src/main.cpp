@@ -1,5 +1,6 @@
 #include <iostream>
 #include <string>
+#include <sstream>
 #include <vector>
 #include <unordered_map>
 #include <functional>
@@ -38,12 +39,11 @@ void split(
     std::string                str,
     const char                *delimiter
 ){
-    int start = 0, end;
-    while (start < str.size()){
-        end = str.find(delimiter, start+1) + 1;
-        vec_ptr->push_back(str.substr(start, end - start - 1));
-        start = end;
-    }
+    std::stringstream stream(str);
+    std::string chunk;
+    while(std::getline(stream, chunk, *delimiter))
+        vec_ptr->push_back(chunk);
+
 }
 
 
@@ -101,20 +101,14 @@ void __builtin_type(std::string input) {
 
     bool found = false;
     std::string executable_path;
-
-    if (PATH.size() == 0)
-        found = false;
-    else {
-        // search executable in PATH folders
-        for (int i = 0; i < PATH.size(); i++) {
-            found = __search_file(PATH.at(i), input);
-            if (found) {
-                executable_path = PATH.at(i) + PATH_SEPARATOR + input;
-                break;
-            }
+    for (int i = 0; i < PATH.size(); i++) {
+        found = __search_file(PATH.at(i), input);
+        if (found) {
+            executable_path = PATH.at(i) + PATH_SEPARATOR + input;
+            break;
         }
     }
-   
+    
     if (found)
         std::cout << input << " is " << executable_path << std::endl;
     else
