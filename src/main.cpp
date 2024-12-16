@@ -41,9 +41,9 @@ void split(
 ){
     std::stringstream stream(str);
     std::string chunk;
-    while(std::getline(stream, chunk, *delimiter))
+    while(std::getline(stream, chunk, *delimiter)) {
         vec_ptr->push_back(chunk);
-
+    }
 }
 
 
@@ -96,8 +96,10 @@ void __builtin_echo(std::string input) {
  * 
  */
 void __builtin_type(std::string input) {
-    if (BUILTIN_FUNCTIONS.count(input) || input == "exit")
+    if (BUILTIN_FUNCTIONS.count(input) || input == "exit") {
         std::cout << input << " is a shell builtin" << std::endl;
+        return;
+    }
 
     bool found = false;
     std::string executable_path;
@@ -113,7 +115,6 @@ void __builtin_type(std::string input) {
         std::cout << input << " is " << executable_path << std::endl;
     else
         std::cout << input << ": not found" << std::endl;
-
 }
 
 
@@ -150,7 +151,7 @@ int main() {
         command = input.substr(0, input.find(" "));
         command_args = input.substr(input.find(" ")+1); 
         
-        if (BUILTIN_FUNCTIONS.count(command))
+        if (BUILTIN_FUNCTIONS.count(command)) 
             BUILTIN_FUNCTIONS[command](command_args);
         else
             std::cout << input << ": command not found" << std::endl;
