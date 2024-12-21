@@ -357,7 +357,7 @@ void __builtin_change_directory(std::string input)
     {
         if (fs::is_directory(new_path) == false) 
         {
-            std::cout << "Not a directory: " << new_path.string() << std::endl;
+            std::cout << "cd: " << new_path.string() << ": No such file or directory" << std::endl;
             return;
         }
 
