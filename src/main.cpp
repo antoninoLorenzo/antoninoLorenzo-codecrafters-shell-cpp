@@ -37,6 +37,7 @@ std::vector<std::string> PATH;
 
 // current working directory
 fs::path WORKING_DIR = fs::current_path();
+fs::path HOME_DIR;
 
 // unordered map should be more efficient for direct access
 // having a function that returns void is ok, pointers could eventually be used,
@@ -350,6 +351,13 @@ void __builtin_print_working_directory(std::string unused)
  */
 void __builtin_change_directory(std::string input)
 {
+    if (input == "~")
+    {
+        fs::current_path(HOME_DIR);
+        WORKING_DIR = HOME_DIR;
+        return;
+    }
+
     fs::path new_path(input);
     if (new_path.is_absolute() == false)
         new_path = fs::canonical(absolute(new_path));
@@ -369,11 +377,16 @@ int main()
 {
     // parse PATH
     // Microsoft specific alternative: _dupenv_s()
-    const char* path_raw = getenv("PATH");
+    const char *path_raw = getenv("PATH");
     if (path_raw != nullptr) {
         std::string path_str = path_raw;
         split(&PATH, path_str, PATH_DELIMITER);
     }
+
+    // get HOME directory
+    const char *home_dir = getenv("HOME");
+    if (home_dir != nullptr)
+        HOME_DIR = fs::path(home_dir);
 
     // map command names to functions
     BUILTIN_FUNCTIONS["echo"] = [](std::string input){
