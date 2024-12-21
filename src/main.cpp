@@ -340,25 +340,35 @@ void __builtin_print_working_directory(std::string unused)
     std::cout << WORKING_DIR.string() << std::endl;
 }
 
+/**
+ * Implements `cd` command.
+ * 
+ * Handles:
+ * - absolute paths
+ * - relative paths
+ * - user home (~)
+ */
 void __builtin_change_directory(std::string input)
 {
-    // Should handle:
-    // - absolute path 
-    // - relative path
-    // - dots
+    fs::path new_path(input);
+    
+    // handle absolute paths
+    if (new_path.is_absolute())
+    {
+        if (fs::is_directory(new_path) == false) 
+        {
+            std::cout << "Not a directory: " << new_path.string() << std::endl;
+            return;
+        }
 
-    // to differentiate between path types:
-    // start with PATH_DELIMITER    -> absolute 
-    // start with allowed character -> relative
-    // start with .                 -> dots
-    // !!!: std::filesystem has is_absolute and is_relative
+        fs::current_path(new_path);
+        WORKING_DIR = new_path;
+        return;
+    }
 
-    // case absoulute path
-    // go to input directory
-    //
-    // edge case: don't exist -> error
-
-    // case relative path
+    // handle relative paths
+    
+    // case relative path (./src)
     // search input in WORKING_DIR and go to it
     // 
     // edge case: don't exist -> error
@@ -394,6 +404,9 @@ int main()
     };
     BUILTIN_FUNCTIONS["pwd"] = [](std::string unused){
         __builtin_print_working_directory("");
+    };
+    BUILTIN_FUNCTIONS["cd"] = [](std::string input){
+        __builtin_change_directory(input);
     };
 
     // Flush after every std::cout / std:cerr
