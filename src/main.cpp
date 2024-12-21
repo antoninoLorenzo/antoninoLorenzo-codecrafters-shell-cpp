@@ -351,34 +351,17 @@ void __builtin_print_working_directory(std::string unused)
 void __builtin_change_directory(std::string input)
 {
     fs::path new_path(input);
-    
-    // handle absolute paths
-    if (new_path.is_absolute())
-    {
-        if (fs::is_directory(new_path) == false) 
-        {
-            std::cout << "cd: " << new_path.string() << ": No such file or directory" << std::endl;
-            return;
-        }
+    if (new_path.is_absolute() == false)
+        new_path = fs::canonical(absolute(new_path));
 
-        fs::current_path(new_path);
-        WORKING_DIR = new_path;
+    if (fs::is_directory(new_path) == false) 
+    {
+        std::cout << "cd: " << new_path.string() << ": No such file or directory" << std::endl;
         return;
     }
 
-    // handle relative paths
-    
-    // case relative path (./src)
-    // search input in WORKING_DIR and go to it
-    // 
-    // edge case: don't exist -> error
-
-    // case dots: .., ../, ../.., ../../ etc.
-    // possible approach:
-    // split(&tmp, input, PATH_DELIMITER);
-    // go parent directory for tmp.size() times
-    //
-    // edge case: too much ../ -> got to highest possible path
+    fs::current_path(new_path);
+    WORKING_DIR = new_path;
 }
 
 
