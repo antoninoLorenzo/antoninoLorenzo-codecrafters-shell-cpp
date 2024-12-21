@@ -10,6 +10,7 @@
 namespace fs = std::filesystem;
 
 #if __linux__
+    #include <cstring>
     #include <unistd.h>
     #include <sys/types.h>
     const char *PATH_DELIMITER = ":";
