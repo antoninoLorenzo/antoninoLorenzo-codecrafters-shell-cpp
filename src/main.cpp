@@ -35,6 +35,9 @@ namespace fs = std::filesystem;
 // Note: std::vector is a dynamic array
 std::vector<std::string> PATH;
 
+// current working directory
+fs::path WORKING_DIR = fs::current_path();
+
 // unordered map should be more efficient for direct access
 // having a function that returns void is ok, pointers could eventually be used,
 // but having a single param is a pain in the ass with string parsing in complex scenarios.
@@ -332,6 +335,42 @@ void __builtin_exec(std::string input)
     #endif
 }
 
+void __builtin_print_working_directory(std::string unused)
+{
+    std::cout << WORKING_DIR << std::endl;
+}
+
+void __builtin_change_directory(std::string input)
+{
+    // Should handle:
+    // - absolute path 
+    // - relative path
+    // - dots
+
+    // to differentiate between path types:
+    // start with PATH_DELIMITER    -> absolute 
+    // start with allowed character -> relative
+    // start with .                 -> dots
+    // !!!: std::filesystem has is_absolute and is_relative
+
+    // case absoulute path
+    // go to input directory
+    //
+    // edge case: don't exist -> error
+
+    // case relative path
+    // search input in WORKING_DIR and go to it
+    // 
+    // edge case: don't exist -> error
+
+    // case dots: .., ../, ../.., ../../ etc.
+    // possible approach:
+    // split(&tmp, input, PATH_DELIMITER);
+    // go parent directory for tmp.size() times
+    //
+    // edge case: too much ../ -> got to highest possible path
+}
+
 
 int main() 
 {
@@ -352,6 +391,9 @@ int main()
     };
     BUILTIN_FUNCTIONS["exec"] = [](std::string input){
         __builtin_exec(input);
+    };
+    BUILTIN_FUNCTIONS["pwd"] = [](std::string unused){
+        __builtin_print_working_directory("");
     };
 
     // Flush after every std::cout / std:cerr
