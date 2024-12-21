@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #
 # Use this script to run your program LOCALLY.
 #
@@ -22,4 +22,9 @@ set -e # Exit early if any commands fail
 #
 # - Edit this to change how your program runs locally
 # - Edit .codecrafters/run.sh to change how your program runs remotely
-exec ./build/Debug/shell "$@"
+if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+  exec ./build/shell "$@"
+else
+  exec ./build/Debug/shell "$@"
+fi
+

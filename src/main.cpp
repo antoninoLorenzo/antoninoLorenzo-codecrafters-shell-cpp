@@ -183,9 +183,7 @@ void __builtin_exec(std::string input)
         found = __search_file(PATH.at(i), split_args.at(0));
         if (found) 
         {
-            // path must be quoted otherwise it won't find the file
-            // when there is a space (ex. C:\Program Files\Git\usr\bin\ls)
-            executable_path = "\"" + PATH.at(i) + PATH_SEPARATOR + split_args.at(0) + "\"";
+            executable_path = PATH.at(i) + PATH_SEPARATOR + split_args.at(0) ;
             break;
         }
     }
@@ -208,6 +206,10 @@ void __builtin_exec(std::string input)
         si.cb = sizeof(si);
         SecureZeroMemory(&pi, sizeof(pi));
 
+        // path must be quoted otherwise it won't find the file
+        // when there is a space (ex. C:\Program Files\Git\usr\bin\ls)
+        executable_path = "\"" + executable_path + "\"";
+        
         // convert split_args to string with full path instead of the command.
         // ex. ls -la = "C:\Program Files\Git\usr\bin\ls" -la 
         split_args.at(0) = executable_path;
