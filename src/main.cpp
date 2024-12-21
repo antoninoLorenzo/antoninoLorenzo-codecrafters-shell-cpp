@@ -11,8 +11,11 @@ namespace fs = std::filesystem;
 
 #if __linux__
     #include <cstring>
+    #include <stdlib.h>
     #include <unistd.h>
     #include <sys/types.h>
+    #include <sys/wait.h>
+
     const char *PATH_DELIMITER = ":";
     const char *PATH_SEPARATOR = "/";
 #elif _WIN32
@@ -242,6 +245,82 @@ void __builtin_exec(std::string input)
 
     #elif __linux__
         // use fork
+        pid_t pid;
+        int stdin_pipe[2], stdout_pipe[2];
+
+        if (pipe(stdin_pipe) == -1)
+        {
+            std::cout << "Error creating stdin pipe" << std::endl;
+            return;
+        }
+
+        if (pipe(stdout_pipe) == -1)
+        {
+            std::cout << "Error creating stdout pipe" << std::endl;
+            return;
+        } 
+
+        pid = fork();
+        if (pid < 0)
+        {
+            std::cout << "Fork failed." << std::endl;
+            return;
+        } 
+
+        if (pid > 0)
+        {
+            int status, n_bytes;
+            char child_stdout_buffer[BUF_SIZE] = {0};
+
+            close(stdin_pipe[READ_END]); // parent writes to stdin
+            close(stdout_pipe[WRITE_END]); // parent reads from stdout
+
+            // exec (in)
+            while ((n_bytes = read(stdout_pipe[READ_END], child_stdout_buffer, BUF_SIZE)) > 0)
+            {
+                std::cout << std::flush;
+                write(STDOUT_FILENO, child_stdout_buffer, n_bytes);
+                std::cout << std::flush;
+            }
+
+            // std::string some;
+            // std::getline(std::cin, some);
+            // write(stdin_pipe[WRITE_END], some.c_str(), some.size() + 1);
+
+            close(stdin_pipe[WRITE_END]); // done taking input 
+            close(stdout_pipe[READ_END]); // done reading
+
+            waitpid(pid, &status, 0);
+        }
+        else if (pid == 0)
+        {
+            close(stdin_pipe[WRITE_END]); //  son reads from stdin
+
+            // handle standard output (son writes to stdout)
+            if (dup2(stdout_pipe[WRITE_END], STDOUT_FILENO) == -1)
+            {
+                perror("dup2: stdout");
+                exit(EXIT_FAILURE);
+            }
+
+            close(stdout_pipe[READ_END]); 
+            close(stdout_pipe[WRITE_END]);
+
+            // exec (out)
+            
+            std::vector<char *> c_args;
+            
+            c_args.push_back(const_cast<char*>(executable_path.c_str()));
+            for (size_t i = 1; i < split_args.size(); ++i)
+                c_args.push_back(const_cast<char*>(split_args[i].c_str()));
+            c_args.push_back(nullptr);
+
+            execv(executable_path.c_str(), c_args.data());
+
+            perror("shell");
+            close(STDOUT_FILENO);
+            exit(EXIT_FAILURE);
+        }
     #else 
         #error "Sub-processing unavailable for current OS"
     #endif
