@@ -10,9 +10,12 @@
 namespace fs = std::filesystem;
 
 #if __linux__
+    #include <unistd.h>
+    #include <sys/types.h>
     const char *PATH_DELIMITER = ":";
     const char *PATH_SEPARATOR = "/";
 #elif _WIN32
+    #include <Windows.h>
     const char *PATH_DELIMITER = ";";
     const char *PATH_SEPARATOR = "\\";
 #else
@@ -25,6 +28,8 @@ namespace fs = std::filesystem;
 std::vector<std::string> PATH;
 
 // unordered map should be more efficient for direct access
+// having a function that returns void is ok, pointers could eventually be used,
+// but having a single param is a pain in the ass with string parsing in complex scenarios.
 std::unordered_map<
     std::string, 
     std::function<void(std::string)>
@@ -43,6 +48,26 @@ void split(
     std::string chunk;
     while(std::getline(stream, chunk, *delimiter)) {
         vec_ptr->push_back(chunk);
+    }
+}
+
+/**
+ * Replace every occurence of old_value to new_value in a string.
+ * Similar to Python str.replace()
+ */
+void replace(
+    std::string *str,
+    const char  *old_value,
+    const char  *new_value
+)
+{   
+    std::size_t pos = 0; 
+    std::size_t old_len = std::strlen(old_value); 
+
+    while ((pos = str->find(old_value, pos)) != std::string::npos)
+    {
+        str->replace(pos, old_len, new_value);
+        pos += std::strlen(new_value);
     }
 }
 
@@ -75,7 +100,8 @@ bool __search_file(
 /**
  * Implements `echo` command.
  */
-void __builtin_echo(std::string input) {
+void __builtin_echo(std::string input) 
+{
     std::cout << input << std::endl;    
 }
 
@@ -95,17 +121,21 @@ void __builtin_echo(std::string input) {
  * something: not found
  * 
  */
-void __builtin_type(std::string input) {
-    if (BUILTIN_FUNCTIONS.count(input) || input == "exit") {
+void __builtin_type(std::string input) 
+{
+    if (BUILTIN_FUNCTIONS.count(input) || input == "exit") 
+    {
         std::cout << input << " is a shell builtin" << std::endl;
         return;
     }
 
     bool found = false;
     std::string executable_path;
-    for (int i = 0; i < PATH.size(); i++) {
+    for (int i = 0; i < PATH.size(); i++) 
+    {
         found = __search_file(PATH.at(i), input);
-        if (found) {
+        if (found) 
+        {
             executable_path = PATH.at(i) + PATH_SEPARATOR + input;
             break;
         }
@@ -118,8 +148,109 @@ void __builtin_type(std::string input) {
 }
 
 
-int main() {
+/**
+ * Runs an external program located in PATH as a child process.
+ * 
+ * *Note: doesn't handle ./run.something*
+ * 
+ * @param input: full command (name + arguments)
+ */
+void __builtin_exec(std::string input) 
+{
+    if (input.size() == 0)
+    {
+        std::cout << "Error: empty input" << std::endl;
+        return;
+    }
+
+    std::vector<std::string> split_args;
+    const char *space = " ";
+    // doesn't work properly for cases like `python -c "import os"`
+    split(&split_args, input, space);
+
+    bool found = false;
+    std::string executable_path;
+    for (int i = 0; i < PATH.size(); i++) 
+    {
+        found = __search_file(PATH.at(i), split_args.at(0));
+        if (found) 
+        {
+            // path must be quoted otherwise it won't find the file
+            // when there is a space (ex. C:\Program Files\Git\usr\bin\ls)
+            executable_path = "\"" + PATH.at(i) + PATH_SEPARATOR + split_args.at(0) + "\"";
+            break;
+        }
+    }
+
+    if(!found)
+    {
+        // shouldn't actually happen
+        std::cout << "Error: how is possible that it didn't found now?" << std::endl;
+        return;
+    }
+
+    // Actual subprocess
+    #ifdef _WIN32
+        // use CreateProcess
+        STARTUPINFOA si;
+        PROCESS_INFORMATION pi;
+        BOOL create_flag;
+
+        SecureZeroMemory(&si, sizeof(si));
+        si.cb = sizeof(si);
+        SecureZeroMemory(&pi, sizeof(pi));
+
+        // convert split_args to string with full path instead of the command.
+        // ex. ls -la = "C:\Program Files\Git\usr\bin\ls" -la 
+        split_args.at(0) = executable_path;
+        std::string full_input = "";
+        for (int i = 0; i < split_args.size(); i++)
+        {
+            if (i >= 1)
+                full_input = full_input + " " + split_args.at(i);
+            else
+                full_input = full_input + split_args.at(i);
+        }
+        
+        LPSTR lp_input = (LPSTR) full_input.c_str();
+
+        // std::cout << lp_input << std::endl;
+        create_flag = CreateProcessA(
+            NULL,
+            lp_input,
+            NULL,
+            NULL,
+            FALSE,
+            0,
+            NULL,
+            NULL,
+            &si,
+            &pi
+        );
+
+        if (create_flag == FALSE)
+        {
+            std::cout << "Error creating process: " << GetLastError() << std::endl;
+            // see error codes at https://learn.microsoft.com/en-us/windows/win32/debug/system-error-codes
+            return;
+        }
+
+        WaitForSingleObject(pi.hProcess, INFINITE);
+        CloseHandle(pi.hProcess);
+        CloseHandle(pi.hThread);
+
+    #elif __linux__
+        // use fork
+    #else 
+        #error "Sub-processing unavailable for current OS"
+    #endif
+}
+
+
+int main() 
+{
     // parse PATH
+    // Microsoft specific alternative: _dupenv_s()
     const char* path_raw = getenv("PATH");
     if (path_raw != nullptr) {
         std::string path_str = path_raw;
@@ -132,6 +263,9 @@ int main() {
     };
     BUILTIN_FUNCTIONS["type"] = [](std::string input){
         __builtin_type(input);
+    };
+    BUILTIN_FUNCTIONS["exec"] = [](std::string input){
+        __builtin_exec(input);
     };
 
     // Flush after every std::cout / std:cerr
@@ -151,9 +285,29 @@ int main() {
         command = input.substr(0, input.find(" "));
         command_args = input.substr(input.find(" ")+1); 
         
+        // Search in BUILTIN
         if (BUILTIN_FUNCTIONS.count(command)) 
+        {
             BUILTIN_FUNCTIONS[command](command_args);
+            continue;
+        }
+        
+        // Search in PATH, otherwise not found
+        bool found = false;
+        std::string executable_path;
+        for (int i = 0; i < PATH.size(); i++) 
+        {
+            found = __search_file(PATH.at(i), command);
+            if (found) 
+            {
+                executable_path = PATH.at(i) + PATH_SEPARATOR + command;
+                break;
+            }
+        }
+
+        if (found)
+            BUILTIN_FUNCTIONS["exec"](input); // should pass PATH and command_args
         else
-            std::cout << input << ": command not found" << std::endl;
+            std::cout << command << ": command not found" << std::endl;
     }
 }
