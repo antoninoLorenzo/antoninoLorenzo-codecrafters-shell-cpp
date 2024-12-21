@@ -337,7 +337,7 @@ void __builtin_exec(std::string input)
 
 void __builtin_print_working_directory(std::string unused)
 {
-    std::cout << WORKING_DIR << std::endl;
+    std::cout << WORKING_DIR.string() << std::endl;
 }
 
 void __builtin_change_directory(std::string input)
