@@ -109,12 +109,91 @@ bool __search_file(
     return false;
 }
 
+std::string __get_path(
+    std::string executable_name
+)
+{
+    std::string executable_path("");
+    for (int i = 0; i < PATH.size(); i++) 
+    {
+        if (__search_file(PATH.at(i), executable_name)) 
+        {
+            executable_path = PATH.at(i) + PATH_SEPARATOR + executable_name;
+            break;
+        }
+    }
+    return executable_path;
+}
+
+
+std::string __remove_spaces(std::string s)
+{
+    std::string out("");
+    std::vector<std::string> words;
+    split(&words, s, " ");
+    for (int i = 0; i < words.size(); i++)
+    {
+        if (!words.at(i).empty() && words.at(i) != " ")
+        {
+            out = out + words.at(i) + " ";
+        }
+    } 
+
+    return out;
+}
+
+/**
+ * Parses a string to perform variable expansion.
+ * Variable expansion is triggered when the input is enclosed in "..." or not enclosed at all (todo).
+ */
+std::string __eval(std::string command_args)
+{
+    size_t pos_s, pos_e, start = 0;
+    std::string s = command_args;
+
+    // process "..."
+    while (true)
+    {
+        pos_s = s.find("\"", start);
+        if (pos_s == std::string::npos)
+            break;
+            
+        pos_e = s.find("\"", pos_s + 1);
+        if (pos_e == std::string::npos) 
+            break;
+        
+        // evalute substr and replace with the result
+        std::string replacement = s.substr(pos_s+1, pos_e - pos_s - 1);
+        replacement = __remove_spaces(replacement);
+
+        // todo: evaluate content
+        //  - search $(command)
+        //  - replace with __builtin_exec(command)
+        s.replace(pos_s, pos_e - pos_s + 1, replacement);
+        
+        start = pos_e - 1;
+    }
+
+    return s;
+}
+
+
 /**
  * Implements `echo` command.
  */
 void __builtin_echo(std::string input) 
 {
-    std::cout << input << std::endl;    
+    std::string text;
+    std::string first_char = input.substr(0, 1);
+    if (first_char != "'" && first_char != "\"")
+        text = __remove_spaces(input);
+    else if (first_char == "'")
+        // just removes single quotes '' from input
+        text = input.substr(1, input.size()-2);
+    else
+        text = __eval(input);
+
+    std::cout << text << std::endl;
 }
 
 /**
@@ -141,19 +220,8 @@ void __builtin_type(std::string input)
         return;
     }
 
-    bool found = false;
-    std::string executable_path;
-    for (int i = 0; i < PATH.size(); i++) 
-    {
-        found = __search_file(PATH.at(i), input);
-        if (found) 
-        {
-            executable_path = PATH.at(i) + PATH_SEPARATOR + input;
-            break;
-        }
-    }
-    
-    if (found)
+    std::string executable_path = __get_path(input);
+    if (!executable_path.empty())
         std::cout << input << " is " << executable_path << std::endl;
     else
         std::cout << input << ": not found" << std::endl;
@@ -180,19 +248,8 @@ void __builtin_exec(std::string input)
     // doesn't work properly for cases like `python -c "import os"`
     split(&split_args, input, space);
 
-    bool found = false;
-    std::string executable_path;
-    for (int i = 0; i < PATH.size(); i++) 
-    {
-        found = __search_file(PATH.at(i), split_args.at(0));
-        if (found) 
-        {
-            executable_path = PATH.at(i) + PATH_SEPARATOR + split_args.at(0) ;
-            break;
-        }
-    }
-
-    if(!found)
+    std::string executable_path = __get_path(split_args.at(0));
+    if(executable_path.empty())
     {
         // shouldn't actually happen
         std::cout << "Error: how is possible that it didn't found now?" << std::endl;
@@ -336,10 +393,6 @@ void __builtin_exec(std::string input)
     #endif
 }
 
-void __builtin_print_working_directory(std::string unused)
-{
-    std::cout << WORKING_DIR.string() << std::endl;
-}
 
 /**
  * Implements `cd` command.
@@ -399,7 +452,7 @@ int main()
         __builtin_exec(input);
     };
     BUILTIN_FUNCTIONS["pwd"] = [](std::string unused){
-        __builtin_print_working_directory("");
+        std::cout << WORKING_DIR.string() << std::endl;
     };
     BUILTIN_FUNCTIONS["cd"] = [](std::string input){
         __builtin_change_directory(input);
@@ -420,7 +473,12 @@ int main()
             break;
         
         command = input.substr(0, input.find(" "));
-        command_args = input.substr(input.find(" ")+1); 
+        command_args = input.substr(input.find(" ")+1);
+
+        // evaluate command args
+        // echo "some" = echo 'some' = some
+        // echo "$(var)" = var value
+        // echo '$(var)' = $(var)
         
         // Search in BUILTIN
         if (BUILTIN_FUNCTIONS.count(command)) 
@@ -430,20 +488,9 @@ int main()
         }
         
         // Search in PATH, otherwise not found
-        bool found = false;
-        std::string executable_path;
-        for (int i = 0; i < PATH.size(); i++) 
-        {
-            found = __search_file(PATH.at(i), command);
-            if (found) 
-            {
-                executable_path = PATH.at(i) + PATH_SEPARATOR + command;
-                break;
-            }
-        }
-
-        if (found)
-            BUILTIN_FUNCTIONS["exec"](input); // should pass PATH and command_args
+        std::string executable_path = __get_path(command);
+        if (!executable_path.empty())
+            BUILTIN_FUNCTIONS["exec"](__eval(input));
         else
             std::cout << command << ": command not found" << std::endl;
     }
