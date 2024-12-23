@@ -1,6 +1,7 @@
 #include <iostream>
 #include <string>
 #include <sstream>
+#include <regex>
 #include <vector>
 #include <unordered_map>
 #include <functional>
@@ -125,6 +126,24 @@ std::string __get_path(
     return executable_path;
 }
 
+/**
+ * Extracts commands enclosed in $() from a given string and stores them in a vector.
+ */
+void __extract_commands(
+    std::vector<std::string> *commands,
+    std::string               s
+)
+{
+    std::regex command_regex("\\$\\((.*?)\\)");
+    std::smatch command_match;
+    
+    auto search_start = s.cbegin();
+    while (std::regex_search(search_start, s.cend(), command_match, command_regex)) {
+        commands->push_back(command_match[1]);
+        search_start = command_match.suffix().first;
+    }
+}
+
 
 std::string __remove_spaces(std::string s)
 {
@@ -166,9 +185,26 @@ std::string __eval(std::string command_args)
         std::string replacement = s.substr(pos_s+1, pos_e - pos_s - 1);
         replacement = __remove_spaces(replacement);
 
-        // todo: evaluate content
-        //  - search $(command)
-        //  - replace with __builtin_exec(command)
+        // evaluate content
+        // + (DONE) step 1: extract commands 
+        // std::vector<std::string> commands;
+        // __extract_commands(&commands, replacement);
+        //
+        // + step 2: execute commands and store outputs
+        // Note: 
+        //  __builtin_exec prints output, a version that just returns output should be done.
+        //  - for Windows: pipes should be introduced and STARTUPINFO.hStdOutput/Error should be
+        //  set to the pipe.
+        //  - for UNIX: the line `write(STDOUT_FILENO, child_stdout_buffer, n_bytes);` should be
+        //  replaced to write in a buffer that is then returned.
+        //  > Consider writing "reusable code"
+        //
+        // if (commands.size())
+        //    for (auto cmd : commands)
+        // 
+        // + step 3 : replace sections of commands with outputs
+        // ... 
+
         s.replace(pos_s, pos_e - pos_s + 1, replacement);
         
         start = pos_e - 1;
@@ -227,6 +263,82 @@ void __builtin_type(std::string input)
         std::cout << input << ": not found" << std::endl;
 }
 
+// Note: to implement reusable __run_process there is the need to use iterators, this way:
+// - need to print directly (__builtin_exec) : just print while the output comes
+// - need string output     (__eval)         : store the output as it comes
+#ifdef _WIN32
+    /**
+     * 
+     */
+    std::string __run_process(
+        LPSTR lp_input
+    )
+    {
+        STARTUPINFOA si;
+        PROCESS_INFORMATION pi;
+        HANDLE stdout_pipe_r, stdout_pipe_w;
+        HANDLE stderr_pipe_r, stderr_pipe_w;
+        BOOL create_flag;
+
+        create_flag = CreatePipe(&stdout_pipe_r, &stdout_pipe_w, NULL, 0);
+        if (create_flag == FALSE)
+        {
+            std::cout << "Error creating stdout pipe: " << GetLastError() << std::endl;
+            return std::string("");
+        }
+
+        create_flag = CreatePipe(&stderr_pipe_r, &stderr_pipe_w, NULL, 0);
+        if (create_flag == FALSE)
+        {
+            std::cout << "Error creating stderr pipe: " << GetLastError() << std::endl;
+            return std::string("");
+        }
+
+        SecureZeroMemory(&si, sizeof(si));
+        si.cb = sizeof(si);
+        si.dwFlags = STARTF_USESTDHANDLES;
+        si.hStdOutput = stdout_pipe_w;
+        si.hStdError = stderr_pipe_w;
+        SecureZeroMemory(&pi, sizeof(pi));
+
+        create_flag = CreateProcessA(
+            NULL,
+            lp_input,
+            NULL,
+            NULL,
+            FALSE,
+            0,
+            NULL,
+            NULL,
+            &si,
+            &pi
+        );
+
+        if (create_flag == FALSE)
+        {
+            std::cout << "Error creating process: " << GetLastError() << std::endl;
+            return std::string("");
+        }
+
+        WaitForSingleObject(pi.hProcess, INFINITE);
+        
+        CloseHandle(stdout_pipe_r);
+        CloseHandle(stdout_pipe_w);
+        CloseHandle(stderr_pipe_r);
+        CloseHandle(stderr_pipe_w);
+        CloseHandle(pi.hProcess);
+        CloseHandle(pi.hThread);
+    }
+#elif __linux__
+    // ...
+    std::string __run_process(
+        const char *path, 
+        char *const argv[]
+    )
+    {
+
+    }
+#endif
 
 /**
  * Runs an external program located in PATH as a child process.
@@ -267,13 +379,12 @@ void __builtin_exec(std::string input)
         si.cb = sizeof(si);
         SecureZeroMemory(&pi, sizeof(pi));
 
-        // path must be quoted otherwise it won't find the file
-        // when there is a space (ex. C:\Program Files\Git\usr\bin\ls)
+        // CreateProcessA takes the command in the format "<executable_path>" [args...]
+        // where the executable_path is quoted to ensure the executable is found.
+        // ex. ls -la -> "C:\Program Files\Git\usr\bin\ls" -la 
         executable_path = "\"" + executable_path + "\"";
-        
-        // convert split_args to string with full path instead of the command.
-        // ex. ls -la = "C:\Program Files\Git\usr\bin\ls" -la 
         split_args.at(0) = executable_path;
+
         std::string full_input = "";
         for (int i = 0; i < split_args.size(); i++)
         {
@@ -284,8 +395,7 @@ void __builtin_exec(std::string input)
         }
         
         LPSTR lp_input = (LPSTR) full_input.c_str();
-
-        // std::cout << lp_input << std::endl;
+        std::cout << "+ command: " << lp_input << std::endl;
         create_flag = CreateProcessA(
             NULL,
             lp_input,
@@ -301,15 +411,14 @@ void __builtin_exec(std::string input)
 
         if (create_flag == FALSE)
         {
-            std::cout << "Error creating process: " << GetLastError() << std::endl;
             // see error codes at https://learn.microsoft.com/en-us/windows/win32/debug/system-error-codes
+            std::cout << "Error creating process: " << GetLastError() << std::endl;
             return;
         }
 
         WaitForSingleObject(pi.hProcess, INFINITE);
         CloseHandle(pi.hProcess);
         CloseHandle(pi.hThread);
-
     #elif __linux__
         // use fork
         pid_t pid;
