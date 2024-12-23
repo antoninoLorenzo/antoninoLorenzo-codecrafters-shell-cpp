@@ -446,7 +446,6 @@ void __builtin_exec(std::string input)
         }
         
         LPSTR lp_input = (LPSTR) full_input.c_str();
-        std::cout << "+ command: " << lp_input << std::endl;
         create_flag = CreateProcessA(
             NULL,
             lp_input,
@@ -475,11 +474,11 @@ void __builtin_exec(std::string input)
         pid_t pid;
         int stdin_pipe[2], stdout_pipe[2];
 
-        if (pipe(stdin_pipe) == -1)
-        {
-            std::cout << "Error creating stdin pipe" << std::endl;
-            return;
-        }
+        // if (pipe(stdin_pipe) == -1)
+        // {
+        //     std::cout << "Error creating stdin pipe" << std::endl;
+        //     return;
+        // }
 
         if (pipe(stdout_pipe) == -1)
         { 
@@ -499,7 +498,7 @@ void __builtin_exec(std::string input)
             int status, n_bytes;
             char child_stdout_buffer[BUF_SIZE] = {0};
 
-            close(stdin_pipe[READ_END]); // parent writes to stdin
+            // close(stdin_pipe[READ_END]); // parent writes to stdin
             close(stdout_pipe[WRITE_END]); // parent reads from stdout
 
             // exec (in)
@@ -510,18 +509,14 @@ void __builtin_exec(std::string input)
                 std::cout << std::flush;
             }
 
-            // std::string some;
-            // std::getline(std::cin, some);
-            // write(stdin_pipe[WRITE_END], some.c_str(), some.size() + 1);
-
-            close(stdin_pipe[WRITE_END]); // done taking input 
+            // close(stdin_pipe[WRITE_END]); // done taking input 
             close(stdout_pipe[READ_END]); // done reading
 
             waitpid(pid, &status, 0);
         }
         else if (pid == 0)
         {
-            close(stdin_pipe[WRITE_END]); //  son reads from stdin
+            // close(stdin_pipe[WRITE_END]); //  son reads from stdin
 
             // handle standard output (son writes to stdout)
             if (dup2(stdout_pipe[WRITE_END], STDOUT_FILENO) == -1)
@@ -537,16 +532,17 @@ void __builtin_exec(std::string input)
             // make arguments array for execv
             // note: execv doesn't handle quotes
             std::vector<char *> c_args;
+
             c_args.push_back(const_cast<char*>(executable_path.c_str()));
             for (size_t i = 1; i < split_args.size(); ++i)
             {
-                c_args.push_back(
-                    const_cast<char*>(
-                        strip_quotes(split_args[i]).c_str()
-                    )
-                );
+                if (split_args.at(i).front() == '\'' && split_args.at(i).back() == '\'')
+                    split_args.at(i) = split_args.at(i).substr(1, split_args.at(i).size() - 2);
+                
+                c_args.push_back(const_cast<char*>(split_args.at(i).c_str()));
             }
             c_args.push_back(nullptr);
+
             /*
             std::string test("+ command: ");
             for (auto &arg : c_args)
