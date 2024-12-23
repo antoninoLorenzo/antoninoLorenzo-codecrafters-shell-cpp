@@ -336,9 +336,62 @@ void __builtin_type(std::string input)
         char *const argv[]
     )
     {
-
+        return std::string("");
     }
 #endif
+
+
+void split_arguments(
+    std::vector<std::string> *argv,
+    std::string command
+)
+{
+    std::string buffer("");
+    // 0: in single quotes, 1: in double quotes
+    int state[2] = {0}, SINGLE = 0, DOUBLE = 1;
+
+    for (int i = 0; i < command.size(); i++)
+    {
+        char c = command[i];
+
+        if (c == '\'' && !state[DOUBLE]) 
+        {
+            state[SINGLE] = !state[SINGLE];
+            buffer += c;
+        }
+        else if (c == '"' && !state[SINGLE])
+        {
+            state[DOUBLE] = !state[DOUBLE];
+            buffer += c; 
+        }
+        else if (state[SINGLE] || state[DOUBLE])
+        {
+            buffer += c;
+        }
+        else if (c == ' ') 
+        {
+            if (!buffer.empty())
+            {
+                argv->push_back(buffer);
+                buffer.clear();
+            }
+        }
+        else
+            buffer += c;
+    }
+
+    if (!buffer.empty())
+        argv->push_back(buffer);
+}
+
+
+std::string strip_quotes(const std::string &arg) {
+    if (arg.size() >= 2 && arg.front() == '\'' && arg.back() == '\'') {
+        return arg.substr(1, arg.size() - 2);
+    }
+    return arg;
+}
+
 
 /**
  * Runs an external program located in PATH as a child process.
@@ -356,9 +409,7 @@ void __builtin_exec(std::string input)
     }
 
     std::vector<std::string> split_args;
-    const char *space = " ";
-    // doesn't work properly for cases like `python -c "import os"`
-    split(&split_args, input, space);
+    split_arguments(&split_args, input);
 
     std::string executable_path = __get_path(split_args.at(0));
     if(executable_path.empty())
@@ -431,7 +482,7 @@ void __builtin_exec(std::string input)
         }
 
         if (pipe(stdout_pipe) == -1)
-        {
+        { 
             std::cout << "Error creating stdout pipe" << std::endl;
             return;
         } 
@@ -483,14 +534,32 @@ void __builtin_exec(std::string input)
             close(stdout_pipe[WRITE_END]);
 
             // exec (out)
-            
+            // make arguments array for execv
+            // note: execv doesn't handle quotes
             std::vector<char *> c_args;
-            
             c_args.push_back(const_cast<char*>(executable_path.c_str()));
             for (size_t i = 1; i < split_args.size(); ++i)
-                c_args.push_back(const_cast<char*>(split_args[i].c_str()));
+            {
+                c_args.push_back(
+                    const_cast<char*>(
+                        strip_quotes(split_args[i]).c_str()
+                    )
+                );
+            }
             c_args.push_back(nullptr);
-
+            /*
+            std::string test("+ command: ");
+            for (auto &arg : c_args)
+            {
+                if (arg == nullptr)
+                    break;
+                
+                test = test + std::string(arg) + " ";
+                
+            }
+            test = test + "+\n";
+            std::cout << test;
+            */
             execv(executable_path.c_str(), c_args.data());
 
             perror("shell");
