@@ -349,21 +349,28 @@ std::string strip_quotes(const std::string &arg) {
  */
 void __builtin_echo(std::string input) 
 {
-    std::string text, first_char;
+    std::string text, first_char = input.substr(0, 1);
+    
+    if (first_char != "'" && first_char != "\"")
+    {
+        text = __remove_spaces(input);
+        std::cout << text << std::endl;
+        return;
+    }
+
     std::vector<std::string> split_args;
     split_arguments(&split_args, input);
-    
     for (auto &arg : split_args)
     {
         first_char = arg.substr(0, 1);
         
-        if (first_char != "'" && first_char != "\"")
-            text = __remove_spaces(arg);
-        else if (first_char == "'")
+        if (first_char == "'")
             // just removes single quotes '' from input
             text = arg.substr(1, arg.size()-2);
-        else
+        else if (first_char == "\"")
             text = __eval(arg);
+        else 
+            text = arg;
 
         std::cout << text << " ";
     }
@@ -547,6 +554,8 @@ void __builtin_exec(std::string input)
             for (size_t i = 1; i < split_args.size(); ++i)
             {
                 if (split_args.at(i).front() == '\'' && split_args.at(i).back() == '\'')
+                    split_args.at(i) = split_args.at(i).substr(1, split_args.at(i).size() - 2);
+                if (split_args.at(i).front() == '\"' && split_args.at(i).back() == '\"')
                     split_args.at(i) = split_args.at(i).substr(1, split_args.at(i).size() - 2);
                 
                 c_args.push_back(const_cast<char*>(split_args.at(i).c_str()));
