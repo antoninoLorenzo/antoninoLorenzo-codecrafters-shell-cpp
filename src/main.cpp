@@ -183,7 +183,7 @@ std::string __eval(std::string command_args)
         
         // evalute substr and replace with the result
         std::string replacement = s.substr(pos_s+1, pos_e - pos_s - 1);
-        replacement = __remove_spaces(replacement);
+        //replacement = __remove_spaces(replacement);
 
         // evaluate content
         // + (DONE) step 1: extract commands 
@@ -213,55 +213,6 @@ std::string __eval(std::string command_args)
     return s;
 }
 
-
-/**
- * Implements `echo` command.
- */
-void __builtin_echo(std::string input) 
-{
-    std::string text;
-    std::string first_char = input.substr(0, 1);
-    if (first_char != "'" && first_char != "\"")
-        text = __remove_spaces(input);
-    else if (first_char == "'")
-        // just removes single quotes '' from input
-        text = input.substr(1, input.size()-2);
-    else
-        text = __eval(input);
-
-    std::cout << text << std::endl;
-}
-
-/**
- * Implements `type` command, used to determine if a command is available.
- * It searches in BUILTIN_COMMANDS and in PATH.
- * 
- * Examples:
- * 
- * $ type echo
- * echo is a shell builtin
- * 
- * $ type python.exe
- * python is /usr/local/bin/python
- * 
- * $ type something
- * something: not found
- * 
- */
-void __builtin_type(std::string input) 
-{
-    if (BUILTIN_FUNCTIONS.count(input) || input == "exit") 
-    {
-        std::cout << input << " is a shell builtin" << std::endl;
-        return;
-    }
-
-    std::string executable_path = __get_path(input);
-    if (!executable_path.empty())
-        std::cout << input << " is " << executable_path << std::endl;
-    else
-        std::cout << input << ": not found" << std::endl;
-}
 
 // Note: to implement reusable __run_process there is the need to use iterators, this way:
 // - need to print directly (__builtin_exec) : just print while the output comes
@@ -391,6 +342,65 @@ std::string strip_quotes(const std::string &arg) {
     }
     return arg;
 }
+
+
+/**
+ * Implements `echo` command.
+ */
+void __builtin_echo(std::string input) 
+{
+    std::string text, first_char;
+    std::vector<std::string> split_args;
+    split_arguments(&split_args, input);
+    
+    for (auto &arg : split_args)
+    {
+        first_char = arg.substr(0, 1);
+        
+        if (first_char != "'" && first_char != "\"")
+            text = __remove_spaces(arg);
+        else if (first_char == "'")
+            // just removes single quotes '' from input
+            text = arg.substr(1, arg.size()-2);
+        else
+            text = __eval(arg);
+
+        std::cout << text << " ";
+    }
+    std::cout << std::endl;
+}
+
+/**
+ * Implements `type` command, used to determine if a command is available.
+ * It searches in BUILTIN_COMMANDS and in PATH.
+ * 
+ * Examples:
+ * 
+ * $ type echo
+ * echo is a shell builtin
+ * 
+ * $ type python.exe
+ * python is /usr/local/bin/python
+ * 
+ * $ type something
+ * something: not found
+ * 
+ */
+void __builtin_type(std::string input) 
+{
+    if (BUILTIN_FUNCTIONS.count(input) || input == "exit") 
+    {
+        std::cout << input << " is a shell builtin" << std::endl;
+        return;
+    }
+
+    std::string executable_path = __get_path(input);
+    if (!executable_path.empty())
+        std::cout << input << " is " << executable_path << std::endl;
+    else
+        std::cout << input << ": not found" << std::endl;
+}
+
 
 
 /**
@@ -664,7 +674,7 @@ int main()
         // Search in PATH, otherwise not found
         std::string executable_path = __get_path(command);
         if (!executable_path.empty())
-            BUILTIN_FUNCTIONS["exec"](__eval(input));
+            BUILTIN_FUNCTIONS["exec"](input);
         else
             std::cout << command << ": command not found" << std::endl;
     }
