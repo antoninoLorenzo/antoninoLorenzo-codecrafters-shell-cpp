@@ -349,11 +349,26 @@ std::string strip_quotes(const std::string &arg) {
  */
 void __builtin_echo(std::string input) 
 {
+    // const char *metachars[] = {"$", "\\", "\"", "'"};
     std::string text, first_char = input.substr(0, 1);
     
     if (first_char != "'" && first_char != "\"")
     {
         text = __remove_spaces(input);
+
+        // handle `\` (just replace with next character)
+        for (int i = 0; i < text.size(); i++)
+        {
+            if (text.at(i) == '\\')
+            {
+                text = text.replace(
+                    i, 
+                    2, 
+                    std::string(1, text.at(i+1))
+                );
+            }
+        }
+
         std::cout << text << std::endl;
         return;
     }
