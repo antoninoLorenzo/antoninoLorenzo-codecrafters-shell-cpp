@@ -82,9 +82,16 @@ void Shell::__builtin_change_directory(std::string input)
         return;
     }
 
-    std::filesystem::path new_path(input);
-    if (new_path.is_absolute() == false)
-        new_path = std::filesystem::canonical(absolute(new_path));
+    try
+    {
+        if (new_path.is_absolute() == false)
+            new_path = std::filesystem::canonical(absolute(new_path));
+    } 
+    catch(const std::exception& ex)
+    {
+        std::cout << "cd: " << new_path.string() << ": No such file or directory" << std::endl;
+        return;
+    }
 
     if (std::filesystem::is_directory(new_path) == false) 
     {
@@ -297,19 +304,6 @@ void Shell::__builtin_exec(std::string input)
             }
             c_args.push_back(nullptr);
 
-            /*
-            std::string test("+ command: ");
-            for (auto &arg : c_args)
-            {
-                if (arg == nullptr)
-                    break;
-                
-                test = test + std::string(arg) + " ";
-                
-            }
-            test = test + "+\n";
-            std::cout << test;
-            */
             execv(executable_path.c_str(), c_args.data());
 
             perror("shell");
