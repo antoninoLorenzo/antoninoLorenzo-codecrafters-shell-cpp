@@ -82,6 +82,7 @@ void Shell::__builtin_change_directory(std::string input)
         return;
     }
 
+    std::filesystem::path new_path(input);
     try
     {
         if (new_path.is_absolute() == false)
